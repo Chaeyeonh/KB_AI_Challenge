@@ -1,5 +1,10 @@
 import streamlit as st
 from openai import OpenAI
+import requests
+
+selected_event = "해당없음"
+diagnosis_type = "해당없음"
+chat_id = 1 
 
 # 페이지 설정
 st.set_page_config(page_title="MINDoc")
@@ -14,13 +19,35 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 if "openai_model" not in st.session_state:
     st.session_state["openai_model"] = "gpt-4o"
 
-# 이전 페이지에서 저장한 데이터 가져오기
-selected_type = st.session_state.get("diagnosis_type", "해당없음")
-selected_event = st.session_state.get("selected_event", "해당없음")
 
-#디버깅용, 삭제 예정
-st.write("selected_event:", selected_event)
-st.write("diagnosis_type:",selected_type)
+# 서버에서 정보 가져오기
+url = f"https://a6872b71ec47.ngrok-free.app/get_events/{chat_id}"
+res = requests.get(url)
+
+if res.status_code == 200:
+    data = res.json()
+    events = data.get("events", [])
+
+    if events:
+        latest_event = events[-1]
+        selected_event = latest_event.get("event_text", "해당없음")
+        diagnosis_type = latest_event.get("event_type", "해당없음")
+
+        # session_state에도 저장
+        st.session_state["selected_event"] = selected_event
+        st.session_state["diagnosis_type"] = diagnosis_type
+
+        # 디버깅용
+        # st.write("selected_event:", selected_event)
+        # st.write(" diagnosis_type:", diagnosis_type)
+    else:
+        st.warning(" 불러올 이벤트가 없습니다.")
+else:
+    st.error(" 이전 경험 데이터를 불러오는 데 실패했어요")
+    st.write(" 응답 상태 코드:", res.status_code)
+    st.write(" 응답 내용:", res.text)
+
+
 
 # 시스템 메시지 설정
 def get_system_message(diagnosis_type, selected_event):
@@ -64,7 +91,7 @@ def get_system_message(diagnosis_type, selected_event):
 - 예: '그때 어땠어?', '그 이후엔 어떤 변화가 있었어?', '지금은 좀 나아졌어?' 등
 """
     
-system_message = get_system_message(selected_type, selected_event)
+system_message = get_system_message(diagnosis_type, selected_event)
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": system_message}]
@@ -100,6 +127,14 @@ for idx, message in enumerate(st.session_state.messages):
 if prompt := st.chat_input("너의 이야기를 들려줘!"):
     # 사용자 메시지 저장 및 출력
     st.session_state.messages.append({"role": "user", "content": prompt})
+    url = "https://a6872b71ec47.ngrok-free.app/predict"
+    data = {"text": prompt}
+    res = requests.post(url, json=data)
+
+    #디버깅용
+    st.write("서버 응답 상태코드:", res.status_code)
+    st.write("서버 응답 내용:", res.text)
+
     with st.chat_message("user"):
         st.markdown(prompt)
 

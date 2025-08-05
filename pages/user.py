@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 
 #  사이드바 감추기
 hide_sidebar = """
@@ -74,6 +75,7 @@ all_selected = (
 # -------------------------------
 if all_selected:
     if st.button("제출하고 결과 보기"):
+       
 
         score = {
             "회피형": 0,
@@ -82,6 +84,7 @@ if all_selected:
             "정체감 손상형": 0,
             "혼란 억제형": 0
         }
+
 
         
 
@@ -111,6 +114,10 @@ if all_selected:
         st.session_state["selected_event"] = selected_event
         st.session_state["selected_emotions"] = selected_emotions
         st.session_state["selected_reactions"] = selected_reactions
+
+        url = "https://a6872b71ec47.ngrok-free.app/save_event"
+        data = {'chat_id': 1, 'event_text':selected_event , 'event_type':likely_types[0]}
+        res = requests.post(url, json=data)
 
 #  chat으로 이동하는 버튼 
 
