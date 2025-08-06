@@ -22,7 +22,7 @@ st.markdown("아래 항목에서 해당하는 경험을 선택해주세요.")
 if "has_filled_experience" not in st.session_state:
     st.session_state["has_filled_experience"] = False
 
-
+SERVER_URL = st.secrets["server"]["SERVER_URL"]
 # -------------------------------
 # Step 1. 사건 (Trigger)
 # -------------------------------
@@ -115,7 +115,7 @@ if all_selected:
         st.session_state["selected_emotions"] = selected_emotions
         st.session_state["selected_reactions"] = selected_reactions
 
-        url = "https://a6872b71ec47.ngrok-free.app/save_event"
+        url = f"{SERVER_URL}/save_event"
         data = {'chat_id': 1, 'event_text':selected_event , 'event_type':likely_types[0]}
         res = requests.post(url, json=data)
 

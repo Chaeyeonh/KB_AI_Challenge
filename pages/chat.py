@@ -6,6 +6,8 @@ selected_event = "해당없음"
 diagnosis_type = "해당없음"
 chat_id = 1 
 
+SERVER_URL = st.secrets["server"]["SERVER_URL"]
+
 # 페이지 설정
 st.set_page_config(page_title="MINDoc")
 
@@ -21,7 +23,7 @@ if "openai_model" not in st.session_state:
 
 
 # 서버에서 정보 가져오기
-url = f"https://a6872b71ec47.ngrok-free.app/get_events/{chat_id}"
+url = f"{SERVER_URL}/get_events/{chat_id}"
 res = requests.get(url)
 
 if res.status_code == 200:
@@ -127,13 +129,9 @@ for idx, message in enumerate(st.session_state.messages):
 if prompt := st.chat_input("너의 이야기를 들려줘!"):
     # 사용자 메시지 저장 및 출력
     st.session_state.messages.append({"role": "user", "content": prompt})
-    url = "https://a6872b71ec47.ngrok-free.app/predict"
+    url = f"{SERVER_URL}/predict"
     data = {"text": prompt}
     res = requests.post(url, json=data)
-
-    #디버깅용
-    st.write("서버 응답 상태코드:", res.status_code)
-    st.write("서버 응답 내용:", res.text)
 
     with st.chat_message("user"):
         st.markdown(prompt)
