@@ -1,6 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 import requests
+import time
 
 selected_event = "해당없음"
 diagnosis_type = "해당없음"
@@ -95,55 +96,103 @@ def get_system_message(diagnosis_type, selected_event):
     
 system_message = get_system_message(diagnosis_type, selected_event)
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "system", "content": system_message}]
-else:
-    st.session_state.messages[0] = {"role": "system", "content": system_message}  # 항상 갱신
-
+# 초기값 설정
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 if "first_bot_message_done" not in st.session_state:
     st.session_state.first_bot_message_done = False
 
-# 첫 assistant 메시지 생성 (딱 한 번만 실행)
-if not st.session_state.first_bot_message_done:
-    response = client.chat.completions.create(
-        model=st.session_state["openai_model"],
-        messages=st.session_state.messages,
-        stream=False
-    )
-    first_message = response.choices[0].message.content
+# 대화 불러오기 (최초 1회)
+if not st.session_state.chat_history:
+    res = requests.get(f"{SERVER_URL}/get_conversations/{chat_id}")
+    if res.status_code == 200:
+        conversations = res.json().get("conversations", [])
+        temp_history = []
+        pair = {}
+        for msg in conversations:
+            role = msg["role"]
+            content = msg["content"]
+            if role == "user":
+                if pair:
+                    temp_history.append(pair)
+                    pair = {}
+                pair["user_text"] = content
+            elif role == "gpt":
+                if "user_text" not in pair:
+                    pair["user_text"] = None
+                pair["gpt_text"] = content
+                temp_history.append(pair)
+                pair = {}
+        if pair:
+            temp_history.append(pair)
+        st.session_state.chat_history = temp_history
 
-    st.session_state.messages.append({"role": "assistant", "content": first_message})
-    st.session_state.first_bot_message_done = True
+# 유틸 함수
+def is_chat_empty(chat_history):
+    return len(chat_history) == 0
 
-# 이전 메시지 출력 (첫 system 메시지는 출력 제외)
-for idx, message in enumerate(st.session_state.messages):
-    #  중복 방지: 첫 assistant 메시지일 경우, 생성 직후 출력했으니 건너뜀
-    if idx == 1 and message["role"] == "assistant" and st.session_state.first_bot_message_done:
-        continue
-    if idx > 0:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+def is_last_message_user(chat_history):
+    if not chat_history:
+        return False
+    return chat_history[-1].get("user_text") is not None
+def should_gpt_auto_respond():
+    return len(st.session_state.chat_history) == 0
 
+# GPT가 먼저 말해야 하는 조건
+if should_gpt_auto_respond() and not st.session_state.first_bot_message_done:
+        messages_for_openai = [{"role": "system", "content": system_message}]
+        for pair in st.session_state.chat_history:
+            if pair.get("user_text") is not None:
+                messages_for_openai.append({"role": "user", "content": pair["user_text"]})
+            if pair.get("gpt_text") is not None:
+                messages_for_openai.append({"role": "assistant", "content": pair["gpt_text"]})
 
-# 사용자 입력 받기
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages_for_openai
+        )
+        first_message = response.choices[0].message.content
+
+        st.session_state.chat_history.append({
+            "user_text": None,
+            "gpt_text": first_message
+        })
+        st.session_state.first_bot_message_done = True
+
+# UI 출력
+for pair in st.session_state.chat_history:
+    if pair.get("user_text"):
+        with st.chat_message("user"):
+            st.markdown(pair["user_text"])
+    if pair.get("gpt_text"):
+        with st.chat_message("assistant"):
+            st.markdown(pair["gpt_text"])
+
+# 사용자 입력
 if prompt := st.chat_input("너의 이야기를 들려줘!"):
-    # 사용자 메시지 저장 및 출력
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    url = f"{SERVER_URL}/predict"
-    data = {"text": prompt}
-    res = requests.post(url, json=data)
-
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # GPT 응답 생성
+    messages_for_openai = [{"role": "system", "content": system_message}]
+    for pair in st.session_state.chat_history:
+        if pair.get("user_text") is not None:
+            messages_for_openai.append({"role": "user", "content": pair["user_text"]})
+        if pair.get("gpt_text") is not None:
+            messages_for_openai.append({"role": "assistant", "content": pair["gpt_text"]})
+    messages_for_openai.append({"role": "user", "content": prompt})
+
     with st.chat_message("assistant"):
         stream = client.chat.completions.create(
-            model=st.session_state["openai_model"],
-            messages=st.session_state.messages,
+            model="gpt-4o",
+            messages=messages_for_openai,
             stream=True
         )
-        response = st.write_stream(stream)
+        gpt_response = st.write_stream(stream)
 
-    # 응답 저장
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    # 새 쌍 저장
+    new_pair = {"user_text": prompt, "gpt_text": gpt_response, "chat_id": chat_id}
+    st.session_state.chat_history.append(new_pair)
+
+    # 서버로 저장
+    res = requests.post(f"{SERVER_URL}/predict", json=new_pair)
+   
