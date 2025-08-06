@@ -1,11 +1,10 @@
 import streamlit as st
 from openai import OpenAI
 import requests
-import time
+import json
 
 selected_event = "해당없음"
 diagnosis_type = "해당없음"
-chat_id = 1 
 
 SERVER_URL = st.secrets["server"]["SERVER_URL"]
 
@@ -22,14 +21,37 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 if "openai_model" not in st.session_state:
     st.session_state["openai_model"] = "gpt-4o"
 
+#최근의 chat_id불러오기
+res = requests.get(f"{SERVER_URL}/latest_chat_id")
+if res.status_code == 200:
+    data = res.json()
 
-# 서버에서 정보 가져오기
-url = f"{SERVER_URL}/get_events/{chat_id}"
+    latest_chat_id  = data.get("latest_chat_id")
+    # st.write("chat_id:", latest_chat_id )  # chat_id 확인
+
+    if "chat_id" not in st.session_state or st.session_state.chat_id != latest_chat_id:
+    # chat_id가 변경되면 새로운 chat_id로 저장하고 대화 내역 초기화
+        st.session_state.chat_id = latest_chat_id
+        st.session_state.chat_history = []  # 대화 내역 초기화
+   
+
+else:
+    st.error("최신 chat_id를 불러오는 데 실패했습니다.")
+    st.stop()
+
+# chat_id가 없으면 에러
+if st.session_state.chat_id is None:
+    st.error("chat_id가 없습니다. 다시 user.py에서 시작해 주세요.")
+    st.stop()
+
+# 서버에서 해당 chat_id에 맞는 정보 가져오기
+url = f"{SERVER_URL}/get_events/{st.session_state.chat_id}"
 res = requests.get(url)
 
 if res.status_code == 200:
     data = res.json()
     events = data.get("events", [])
+    # st.write("서버에서 받은 이벤트:", events)
 
     if events:
         latest_event = events[-1]
@@ -47,8 +69,8 @@ if res.status_code == 200:
         st.warning(" 불러올 이벤트가 없습니다.")
 else:
     st.error(" 이전 경험 데이터를 불러오는 데 실패했어요")
-    st.write(" 응답 상태 코드:", res.status_code)
-    st.write(" 응답 내용:", res.text)
+    # st.write(" 응답 상태 코드:", res.status_code)
+    # st.write(" 응답 내용:", res.text)
 
 
 
@@ -104,7 +126,8 @@ if "first_bot_message_done" not in st.session_state:
 
 # 대화 불러오기 (최초 1회)
 if not st.session_state.chat_history:
-    res = requests.get(f"{SERVER_URL}/get_conversations/{chat_id}")
+    res = requests.get(f"{SERVER_URL}/get_conversations/{st.session_state.chat_id}")
+
     if res.status_code == 200:
         conversations = res.json().get("conversations", [])
         temp_history = []
@@ -190,7 +213,7 @@ if prompt := st.chat_input("너의 이야기를 들려줘!"):
         gpt_response = st.write_stream(stream)
 
     # 새 쌍 저장
-    new_pair = {"user_text": prompt, "gpt_text": gpt_response, "chat_id": chat_id}
+    new_pair = {"user_text": prompt, "gpt_text": gpt_response, "chat_id": st.session_state.chat_id}
     st.session_state.chat_history.append(new_pair)
 
     # 서버로 저장

@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import uuid
 
 #  사이드바 감추기
 hide_sidebar = """
@@ -115,16 +116,29 @@ if all_selected:
         st.session_state["selected_emotions"] = selected_emotions
         st.session_state["selected_reactions"] = selected_reactions
 
+        if "chat_id" not in st.session_state:
+            st.session_state.chat_id = 1  # 초기값 1로 설정
+        else:
+            st.session_state.chat_id = int(st.session_state.chat_id) + 1
+
+        # 현재 chat_id 출력 (디버깅용)
+        st.write("현재 chat_id:", st.session_state.chat_id)
+
+        # 이벤트 저장
         url = f"{SERVER_URL}/save_event"
-        data = {'chat_id': 1, 'event_text':selected_event , 'event_type':likely_types[0]}
+        data = {
+            'chat_id': st.session_state.chat_id, 
+            'event_text': selected_event, 
+            'event_type': likely_types[0]
+        }
         res = requests.post(url, json=data)
 
-#  chat으로 이동하는 버튼 
 
+#  chat으로 이동하는 버튼 
 if st.session_state.get("has_filled_experience", False):
     col1, col2, col3 = st.columns([5, 2, 1])
     with col3:
         if st.button("▶ 상담하기"):
-           
-            
             st.switch_page("pages/chat.py")
+
+            
