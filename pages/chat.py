@@ -27,7 +27,7 @@ if res.status_code == 200:
     data = res.json()
 
     latest_chat_id  = data.get("latest_chat_id")
-    # st.write("chat_id:", latest_chat_id )  # chat_id 확인
+    st.write("chat_id:", latest_chat_id )  # chat_id 확인
 
     if "chat_id" not in st.session_state or st.session_state.chat_id != latest_chat_id:
     # chat_id가 변경되면 새로운 chat_id로 저장하고 대화 내역 초기화
@@ -130,6 +130,7 @@ if not st.session_state.chat_history:
 
     if res.status_code == 200:
         conversations = res.json().get("conversations", [])
+        #st.write("서버에서 받은 대화 내역:", conversations)
         temp_history = []
         pair = {}
         for msg in conversations:
@@ -151,13 +152,7 @@ if not st.session_state.chat_history:
         st.session_state.chat_history = temp_history
 
 # 유틸 함수
-def is_chat_empty(chat_history):
-    return len(chat_history) == 0
 
-def is_last_message_user(chat_history):
-    if not chat_history:
-        return False
-    return chat_history[-1].get("user_text") is not None
 def should_gpt_auto_respond():
     return len(st.session_state.chat_history) == 0
 
@@ -176,20 +171,29 @@ if should_gpt_auto_respond() and not st.session_state.first_bot_message_done:
         )
         first_message = response.choices[0].message.content
 
-        st.session_state.chat_history.append({
-            "user_text": None,
-            "gpt_text": first_message
-        })
+        first_pair = {
+        "user_text": "",
+        "gpt_text": first_message,
+        "chat_id": st.session_state.chat_id
+        }
+        
+        st.session_state.chat_history.append(first_pair)
         st.session_state.first_bot_message_done = True
-
+        res = requests.post(f"{SERVER_URL}/predict", json=first_pair)
+        if res.status_code != 200:
+            st.warning(f"⚠️ 첫 GPT 메시지 저장 실패: {res.status_code}")
+            st.write("📦 전송된 데이터:", first_pair)
+            st.write("📥 서버 응답:", res.text)
 # UI 출력
+
 for pair in st.session_state.chat_history:
-    if pair.get("user_text"):
+    if pair.get("user_text") is not None:
         with st.chat_message("user"):
             st.markdown(pair["user_text"])
-    if pair.get("gpt_text"):
+    if pair.get("gpt_text") is not None:
         with st.chat_message("assistant"):
             st.markdown(pair["gpt_text"])
+
 
 # 사용자 입력
 if prompt := st.chat_input("너의 이야기를 들려줘!"):
@@ -198,12 +202,10 @@ if prompt := st.chat_input("너의 이야기를 들려줘!"):
 
     messages_for_openai = [{"role": "system", "content": system_message}]
     for pair in st.session_state.chat_history:
-        if pair.get("user_text") is not None:
-            messages_for_openai.append({"role": "user", "content": pair["user_text"]})
-        if pair.get("gpt_text") is not None:
             messages_for_openai.append({"role": "assistant", "content": pair["gpt_text"]})
     messages_for_openai.append({"role": "user", "content": prompt})
 
+    # GPT 응답 받기
     with st.chat_message("assistant"):
         stream = client.chat.completions.create(
             model="gpt-4o",
@@ -212,10 +214,9 @@ if prompt := st.chat_input("너의 이야기를 들려줘!"):
         )
         gpt_response = st.write_stream(stream)
 
-    # 새 쌍 저장
-    new_pair = {"user_text": prompt, "gpt_text": gpt_response, "chat_id": st.session_state.chat_id}
+    # 새 대화 쌍 저장 (GPT 응답은 `gpt_text`, 사용자 입력은 `user_text`)
+    new_pair = {"gpt_text": gpt_response, "user_text": prompt, "chat_id": st.session_state.chat_id}
     st.session_state.chat_history.append(new_pair)
-
     # 서버로 저장
     res = requests.post(f"{SERVER_URL}/predict", json=new_pair)
    

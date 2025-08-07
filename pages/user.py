@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import uuid
 
 #  사이드바 감추기
 hide_sidebar = """
@@ -121,8 +120,7 @@ if all_selected:
         else:
             st.session_state.chat_id = int(st.session_state.chat_id) + 1
 
-        # 현재 chat_id 출력 (디버깅용)
-        st.write("현재 chat_id:", st.session_state.chat_id)
+      
 
         # 이벤트 저장
         url = f"{SERVER_URL}/save_event"
@@ -132,6 +130,11 @@ if all_selected:
             'event_type': likely_types[0]
         }
         res = requests.post(url, json=data)
+
+        st.write("🪪 현재 chat_id:", st.session_state.chat_id)
+        st.write("📦 전송할 데이터:", data)
+
+
 
 
 #  chat으로 이동하는 버튼 
