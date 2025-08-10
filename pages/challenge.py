@@ -15,9 +15,7 @@ MAX_LEVEL_IMAGE = 4
 # -----------------------------
 if "USER_ID" not in st.session_state:
     st.session_state.USER_ID = 300
-# 표시 전용 캐릭터 오버라이드(미리보기)
-if "OVERRIDE_CHAR" not in st.session_state:
-    st.session_state.OVERRIDE_CHAR = None
+
 
 USER_ID = st.session_state.USER_ID
 TODAY = date.today().isoformat()
@@ -44,16 +42,6 @@ def api_complete_mission(mission_id: int):
         f"{SERVER_URL}/api/users/{USER_ID}/missions/{mission_id}/complete",
         timeout=5
     )
-
-
-def clear_all_cache_and_rerun(release_today_lock: bool = False):
-    try:
-        st.cache_data.clear()
-    except Exception:
-        pass
-    if release_today_lock and "today_mission_lock" in st.session_state:
-        st.session_state.today_mission_lock.pop(TODAY_KEY, None)
-    st.rerun()
 
 # -----------------------------
 # “오늘 미션 고정” 세션 가드
@@ -84,11 +72,6 @@ else:
     is_completed = backend_today["is_completed"]
 
 # -----------------------------
-# 표시용 캐릭터(미리보기 적용)
-# -----------------------------
-effective_char = st.session_state.OVERRIDE_CHAR or character
-
-# -----------------------------
 # 레이아웃
 # -----------------------------
 left, center = st.columns([2, 5])
@@ -96,9 +79,9 @@ left, center = st.columns([2, 5])
 with left:
     with st.container(border=False):
         st.markdown("<div style='height:200px'></div>", unsafe_allow_html=True)
-        st.markdown(f"<h3 style='text-align:center;'>LV. {effective_char['level']}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='text-align:center;'>LV. {character['level']}</h3>", unsafe_allow_html=True)
 
-        img_path = get_character_image(effective_char['level'])
+        img_path = get_character_image(character['level'])
         if img_path:
             st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
             st.image(img_path, width=270)
@@ -106,8 +89,8 @@ with left:
             st.markdown("<div style='font-size:60px;text-align:center;margin-top:24px;'>🧑‍🚀</div>", unsafe_allow_html=True)
 
         # === XP 표시(백엔드 규칙: total_exp=현재 레벨 누적, next_exp_req=필요치) ===
-        need_total = int(effective_char['next_exp_req'])       # 5→6→7… 가변
-        earned_in_level = int(effective_char['total_exp'])     # 현재 레벨 누적
+        need_total = int(character['next_exp_req'])       # 5→6→7… 가변
+        earned_in_level = int(character['total_exp'])     # 현재 레벨 누적
         col_xp1, col_xp2 = st.columns(2)
         with col_xp1:
             st.metric("이번 레벨 누적", f"{earned_in_level}/{need_total} XP")
@@ -165,20 +148,3 @@ with center:
                     unsafe_allow_html=True,
                 )
 
-# -----------------------------
-# 사이드바
-# -----------------------------
-with st.sidebar:
-    st.markdown("### 👤 테스트 유저 전환")
-    new_id = st.number_input("USER_ID", min_value=1, value=int(USER_ID), step=1)
-    if st.button("이 유저로 보기", use_container_width=True):
-        st.session_state.USER_ID = int(new_id)
-        # 프론트 상태 정리
-        st.session_state.today_mission_lock = {}
-        st.session_state.OVERRIDE_CHAR = None
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
-        st.success(f"USER_ID {new_id} 로 전환")
-        st.rerun()
