@@ -12,7 +12,7 @@ SERVER_URL = st.secrets["server"]["SERVER_URL"]
 st.set_page_config(page_title="MINDoc")
 
 # 페이지 타이틀
-st.title("지친 마음, 혼자 끌어안지 말고 털어놓으세요")
+st.title("지친 마음, 혼자 끌어안지 말고 털어놓으세요👐")
 
 # OpenAI 클라이언트 생성
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])

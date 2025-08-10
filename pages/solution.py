@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import re
 
 st.set_page_config(
     page_title = "MINDoc"
@@ -20,15 +21,6 @@ else:
     st.stop()
 
 
-
-def get_eul_reul(word):
-    # 받침이 있으면 '을', 없으면 '를'
-    last_char = word[-1]
-    code = ord(last_char) - ord('가')
-    jongseong = code % 28
-    return '을' if jongseong != 0 else '를'
-
-
 url = f"{SERVER_URL}/get_events/{latest_chat_id}"
 res = requests.get(url)
 
@@ -40,8 +32,7 @@ if res.status_code == 200:
         latest_event = events[-1]
         selected_event = latest_event.get("event_text", "해당없음")
         st.session_state["selected_event"] = selected_event
-        particle = get_eul_reul(selected_event)
-        st.title(f"{selected_event}{particle} 겪었을 때는 이렇게 해보세요!")
+
 
 
 # 백엔드 연동
@@ -59,12 +50,9 @@ def fetch_options(category: str):
         return []
     
 def group_by_steps(lines):
-    """
-    대괄호로 감싼 제목 줄([1단계...], [2단계...])을 '단계'로 보고
-    그 아래 항목들을 묶어서 반환합니다.
-    """
     groups = []
     current = None
+    preface = []  # [1단계] 이전의 내용 저장
 
     def flush():
         if current is not None:
@@ -77,29 +65,41 @@ def group_by_steps(lines):
             current = {"title": line.strip("[]"), "items": []}
         else:
             if current is None:
-                # 제목 없이 시작하는 경우를 대비해 '기타' 묶음 생성
-                current = {"title": "기타", "items": []}
-            current["items"].append(line)
+                preface.append(line)
+            else:
+                current["items"].append(line)
     flush()
-    return groups
+    return preface, groups
+
 
 # 옵션 불러오기
 option_lines = fetch_options(st.session_state.get("selected_event", "해당없음"))
 
 if option_lines:
-    groups = group_by_steps(option_lines)
+    preface, groups = group_by_steps(option_lines)
 
+    if preface:
+        for line in preface:
+            st.title(line)
     st.divider()
-    st.subheader("체크리스트")
 
     for gi, g in enumerate(groups):
         with st.container(border=True):
-            # 단계/섹션 제목 (메인 체크박스: 단계 완료 여부)
-            done = st.checkbox(g["title"], key=f"grp_done_{gi}")
+            # 단계 제목 굵게
+            st.markdown(f"<h3 style='color:orange'>[{g['title']}]</h4>", unsafe_allow_html=True)
 
-            # 상세 항목 (서브 체크박스)
+
             for ii, item in enumerate(g["items"]):
-                st.checkbox(f"• {item}", key=f"grp_{gi}_item_{ii}")
+                if re.match(r'^\s*\d+\.\s', item):
+                    # 숫자. 로 시작 → 체크박스 + h4 텍스트를 같은 줄에
+                    c1, c2 = st.columns([1, 24])
+                    with c1:
+                        st.checkbox("", key=f"grp_{gi}_item_{ii}", label_visibility="collapsed")
+                    with c2:
+                        st.markdown(f"#### **{item}**")
+                else:
+                # 나머지 :들여쓰기 + 글머리기호
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• {item}", unsafe_allow_html=True)
 
 else:
-    st.info("표시할 대처방안이 없습니다.")
+    st.info('표시할 대처방안이 없습니다.')

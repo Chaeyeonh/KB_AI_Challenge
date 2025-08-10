@@ -15,7 +15,7 @@ hide_sidebar = """
 st.markdown(hide_sidebar, unsafe_allow_html=True)
 
 #  사용자 경험 입력
-st.title("당신의 이야기를 들려주세요")
+st.title("당신의 이야기를 들려주세요😊")
 st.markdown("아래 항목에서 해당하는 경험을 선택해주세요.")
 
 # 세션 상태 초기화

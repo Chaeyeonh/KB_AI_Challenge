@@ -4,7 +4,7 @@ import os
 from datetime import date
 
 st.set_page_config(page_title="MINDoc", layout="wide")
-st.title("데일리 챌린지")
+st.title("데일리 챌린지✅")
 
 SERVER_URL = st.secrets["server"]["SERVER_URL"]
 XP_PER_LEVEL = 5
