@@ -131,9 +131,6 @@ if all_selected:
         }
         res = requests.post(url, json=data)
 
-        st.write("🪪 현재 chat_id:", st.session_state.chat_id)
-        st.write("📦 전송할 데이터:", data)
-
 
 
 

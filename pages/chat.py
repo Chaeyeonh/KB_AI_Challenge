@@ -27,7 +27,6 @@ if res.status_code == 200:
     data = res.json()
 
     latest_chat_id  = data.get("latest_chat_id")
-    st.write("chat_id:", latest_chat_id )  # chat_id 확인
 
     if "chat_id" not in st.session_state or st.session_state.chat_id != latest_chat_id:
     # chat_id가 변경되면 새로운 chat_id로 저장하고 대화 내역 초기화
@@ -181,18 +180,20 @@ if should_gpt_auto_respond() and not st.session_state.first_bot_message_done:
         st.session_state.first_bot_message_done = True
         res = requests.post(f"{SERVER_URL}/predict", json=first_pair)
         if res.status_code != 200:
-            st.warning(f"⚠️ 첫 GPT 메시지 저장 실패: {res.status_code}")
-            st.write("📦 전송된 데이터:", first_pair)
-            st.write("📥 서버 응답:", res.text)
+            st.warning(f"첫 GPT 메시지 저장 실패: {res.status_code}")
+            st.write("전송된 데이터:", first_pair)
+            st.write("서버 응답:", res.text)
 # UI 출력
 
 for pair in st.session_state.chat_history:
-    if pair.get("user_text") is not None:
+    if pair.get("user_text"):  
         with st.chat_message("user"):
             st.markdown(pair["user_text"])
-    if pair.get("gpt_text") is not None:
+
+    if pair.get("gpt_text"):
         with st.chat_message("assistant"):
             st.markdown(pair["gpt_text"])
+
 
 
 # 사용자 입력
