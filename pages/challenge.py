@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 import os
 from datetime import date
+from streamlit_cookies_manager import EncryptedCookieManager
+import secrets
 
 st.set_page_config(page_title="MINDoc", layout="wide")
 st.title("데일리 챌린지✅")
@@ -10,17 +12,44 @@ SERVER_URL = st.secrets["server"]["SERVER_URL"]
 XP_PER_LEVEL = 5
 MAX_LEVEL_IMAGE = 4
 
-# -----------------------------
-# USER_ID (세션 보존)
-# -----------------------------
+# ==== 페이지 시작 직후 ====
+cookie_password="0000"
+cookies = EncryptedCookieManager(prefix="mindoc_",  password=cookie_password)
+if not cookies.ready():
+    st.stop()  # 쿠키 초기화 대기(첫 로드 시 1회)
+
+# ==== USER_ID 설정부 교체 ====
+INT32_MAX_SAFE = 2_000_000_000  # DB INT 안전 상한(여유 포함)
+
+def _issue_new_uid() -> str:
+    # 1..(INT32_MAX_SAFE-1) 범위의 정수
+    return str(secrets.randbelow(INT32_MAX_SAFE - 1) + 1)
+
 if "USER_ID" not in st.session_state:
-    st.session_state.USER_ID = 300
+    uid = cookies.get("uid", None)
 
+    need_new = False
+    if uid is None:
+        need_new = True
+    else:
+        try:
+            v = int(uid)
+            if v <= 0 or v >= INT32_MAX_SAFE:
+                need_new = True
+        except Exception:
+            need_new = True
 
-USER_ID = st.session_state.USER_ID
+    if need_new:
+        uid = _issue_new_uid()
+        cookies["uid"] = uid
+        cookies.save()
+
+    st.session_state.USER_ID = int(uid)
+
+USER_ID = int(st.session_state.USER_ID)
+
 TODAY = date.today().isoformat()
 TODAY_KEY = f"{USER_ID}:{TODAY}"
-
 # -----------------------------
 # 캐릭터 이미지
 # -----------------------------
@@ -33,7 +62,7 @@ def get_character_image(level: int) -> str | None:
 # API
 # -----------------------------
 def api_get_dashboard():
-    r = requests.get(f"{SERVER_URL}/api/users/{USER_ID}/dashboard", timeout=5)
+    r = requests.get(f"{SERVER_URL}/api/users/{USER_ID}/dashboard", timeout=10)
     r.raise_for_status()
     return r.json()
 
@@ -95,7 +124,7 @@ with left:
         with col_xp1:
             st.metric("이번 레벨 누적", f"{earned_in_level}/{need_total} XP")
         with col_xp2:
-            st.metric("총 XP(현재 레벨 내)", f"{earned_in_level} XP")
+            st.metric("총 XP", f"{earned_in_level} XP")
 
 with center:
     with st.container(border=True):
