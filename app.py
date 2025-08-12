@@ -1,7 +1,7 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title = "MINDoc", page_icon="💸", layout="wide"
+    page_title = "MINDoc", page_icon="images/favicon.png", layout="wide"
 )
 
 
