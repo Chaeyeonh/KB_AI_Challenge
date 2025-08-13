@@ -28,10 +28,20 @@ if res.status_code == 200:
     data = res.json()
     events = data.get("events", [])
 
-    if events:
-        latest_event = events[-1]
-        selected_event = latest_event.get("event_text", "해당없음")
-        st.session_state["selected_event"] = selected_event
+if events and "selected_event" not in st.session_state:
+    latest_event = events[-1]
+    st.session_state["selected_event"] = latest_event.get("event_text", "해당없음")
+    event_texts = [e.get("event_text", "해당없음") for e in events] or ["해당없음"]
+
+    chosen = st.selectbox(
+        "이벤트 선택",
+        event_texts,
+        index=max(0, event_texts.index(st.session_state["selected_event"]))
+              if st.session_state["selected_event"] in event_texts
+              else len(event_texts) - 1
+    )
+
+    st.session_state["selected_event"] = chosen
 
 
 
@@ -73,8 +83,9 @@ def group_by_steps(lines):
 
 
 # 옵션 불러오기
-option_lines = fetch_options(st.session_state.get("selected_event", "해당없음"))
-
+category_raw = st.session_state.get("selected_event", "해당없음")
+category_for_file = re.sub(r"\s+", "", category_raw)  # 🔹 공백 제거
+option_lines = fetch_options(category_for_file)
 if option_lines:
     preface, groups = group_by_steps(option_lines)
 
